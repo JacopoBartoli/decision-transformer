@@ -145,11 +145,7 @@ class GPT(nn.Module):
 
         logger.info("number of parameters: %e", sum(p.numel() for p in self.parameters()))
 
-
-        self.state_encoder = nn.Sequential(nn.Conv2d(4, 32, 8, stride=4, padding=0), nn.ReLU(),
-                                 nn.Conv2d(32, 64, 4, stride=2, padding=0), nn.ReLU(),
-                                 nn.Conv2d(64, 64, 3, stride=1, padding=0), nn.ReLU(),
-                                 nn.Flatten(), nn.Linear(3136, config.n_embd), nn.Tanh())
+        self.state_encoder = nn.Sequential(nn.Linear(8, config.n_embd), nn.Tanh())
 
         self.ret_emb = nn.Sequential(nn.Linear(1, config.n_embd), nn.Tanh())
 
@@ -218,13 +214,13 @@ class GPT(nn.Module):
 
     # state, action, and return
     def forward(self, states, actions, targets=None, rtgs=None, timesteps=None):
-        # states: (batch, block_size, 4*84*84)
+        # states: (batch, block_size, 8)
         # actions: (batch, block_size, 1)
         # targets: (batch, block_size, 1)
         # rtgs: (batch, block_size, 1)
         # timesteps: (batch, 1, 1)
 
-        state_embeddings = self.state_encoder(states.reshape(-1, 4, 84, 84).type(torch.float32).contiguous()) # (batch * block_size, n_embd)
+        state_embeddings = self.state_encoder(states.reshape(-1, 8).type(torch.float32).contiguous()) # (batch * block_size, n_embd)
         state_embeddings = state_embeddings.reshape(states.shape[0], states.shape[1], self.config.n_embd) # (batch, block_size, n_embd)
         
         if actions is not None and self.model_type == 'reward_conditioned': 

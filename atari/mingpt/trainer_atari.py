@@ -7,6 +7,7 @@ The above copyright notice and this permission notice shall be included in all c
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
+import gym
 
 """
 Simple training loop; Boilerplate that could apply to any arbitrary neural network,
@@ -20,19 +21,15 @@ from tqdm import tqdm
 import numpy as np
 
 import torch
-import torch.optim as optim
-from torch.optim.lr_scheduler import LambdaLR
 from torch.utils.data.dataloader import DataLoader
+from torch.utils.tensorboard import SummaryWriter
+
+from mingpt.utils import sample
+
+writer = SummaryWriter()
 
 logger = logging.getLogger(__name__)
 
-from mingpt.utils import sample
-import atari_py
-from collections import deque
-import random
-import cv2
-import torch
-from PIL import Image
 
 class TrainerConfig:
     # optimization parameters
@@ -135,6 +132,8 @@ class Trainer:
                 test_loss = float(np.mean(losses))
                 logger.info("test loss: %f", test_loss)
                 return test_loss
+            train_loss = float(np.mean(losses))
+            return train_loss
 
         # best_loss = float('inf')
         
@@ -144,7 +143,7 @@ class Trainer:
 
         for epoch in range(config.max_epochs):
 
-            run_epoch('train', epoch_num=epoch)
+            train_loss = run_epoch('train', epoch_num=epoch)
             # if self.test_dataset is not None:
             #     test_loss = run_epoch('test')
 
@@ -158,22 +157,20 @@ class Trainer:
             if self.config.model_type == 'naive':
                 eval_return = self.get_returns(0)
             elif self.config.model_type == 'reward_conditioned':
-                if self.config.game == 'Breakout':
-                    eval_return = self.get_returns(90)
-                elif self.config.game == 'Seaquest':
-                    eval_return = self.get_returns(1150)
-                elif self.config.game == 'Qbert':
-                    eval_return = self.get_returns(14000)
-                elif self.config.game == 'Pong':
-                    eval_return = self.get_returns(20)
+                if self.config.game == 'LunarLander-v2':
+                    eval_return = self.get_returns(200)
                 else:
                     raise NotImplementedError()
             else:
                 raise NotImplementedError()
 
+            writer.add_scalar("Score/train_loss", train_loss, epoch)
+            writer.add_scalar("Score/eval_reward", eval_return, epoch)
+
+
     def get_returns(self, ret):
         self.model.train(False)
-        args=Args(self.config.game.lower(), self.config.seed)
+        args = Args(self.config.game, self.config.seed)
         env = Env(args)
         env.eval()
 
@@ -225,90 +222,29 @@ class Trainer:
 class Env():
     def __init__(self, args):
         self.device = args.device
-        self.ale = atari_py.ALEInterface()
-        self.ale.setInt('random_seed', args.seed)
-        self.ale.setInt('max_num_frames_per_episode', args.max_episode_length)
-        self.ale.setFloat('repeat_action_probability', 0)  # Disable sticky actions
-        self.ale.setInt('frame_skip', 0)
-        self.ale.setBool('color_averaging', False)
-        self.ale.loadROM(atari_py.get_game_path(args.game))  # ROM loading must be done after setting options
-        actions = self.ale.getMinimalActionSet()
-        self.actions = dict([i, e] for i, e in zip(range(len(actions)), actions))
-        self.lives = 0  # Life counter (used in DeepMind training)
-        self.life_termination = False  # Used to check if resetting only from loss of life
-        self.window = args.history_length  # Number of frames to concatenate
-        self.state_buffer = deque([], maxlen=args.history_length)
-        self.training = True  # Consistent with model training mode
+        self.env = gym.make(args.game)
+        self.training = True # Consistent with model training mode
+        self.state = self.env.reset()
 
     def _get_state(self):
-        state = cv2.resize(self.ale.getScreenGrayscale(), (84, 84), interpolation=cv2.INTER_LINEAR)
-        return torch.tensor(state, dtype=torch.float32, device=self.device).div_(255)
-
-    def _reset_buffer(self):
-        for _ in range(self.window):
-            self.state_buffer.append(torch.zeros(84, 84, device=self.device))
+        return self.state
 
     def reset(self):
-        if self.life_termination:
-            self.life_termination = False  # Reset flag
-            self.ale.act(0)  # Use a no-op after loss of life
-        else:
-            # Reset internals
-            self._reset_buffer()
-            self.ale.reset_game()
-            # Perform up to 30 random no-ops before starting
-            for _ in range(random.randrange(30)):
-                self.ale.act(0)  # Assumes raw action 0 is always no-op
-                if self.ale.game_over():
-                    self.ale.reset_game()
-        # Process and return "initial" state
-        observation = self._get_state()
-        self.state_buffer.append(observation)
-        self.lives = self.ale.lives()
-        return torch.stack(list(self.state_buffer), 0)
+        self.state = self.env.reset()
+        return torch.tensor(self.state, dtype=torch.float32, device=self.device)
 
     def step(self, action):
-        # Repeat action 4 times, max pool over last 2 frames
-        frame_buffer = torch.zeros(2, 84, 84, device=self.device)
-        reward, done = 0, False
-        for t in range(4):
-            reward += self.ale.act(self.actions.get(action))
-            if t == 2:
-                frame_buffer[0] = self._get_state()
-            elif t == 3:
-                frame_buffer[1] = self._get_state()
-            done = self.ale.game_over()
-            if done:
-                break
-        observation = frame_buffer.max(0)[0]
-        self.state_buffer.append(observation)
-        # Detect loss of life as terminal in training mode
-        if self.training:
-            lives = self.ale.lives()
-            if lives < self.lives and lives > 0:  # Lives > 0 for Q*bert
-                self.life_termination = not done  # Only set flag when not truly done
-                done = True
-            self.lives = lives
-        # Return state, reward, done
-        return torch.stack(list(self.state_buffer), 0), reward, done
+        self.state, reward, done, _ = self.env.step(action)
+        return torch.tensor(self.state, dtype=torch.float32, device=self.device), reward, done
 
-    # Uses loss of life as terminal signal
-    def train(self):
-        self.training = True
-
-    # Uses standard terminal signal
     def eval(self):
         self.training = False
 
-    def action_space(self):
-        return len(self.actions)
-
-    def render(self):
-        cv2.imshow('screen', self.ale.getScreenRGB()[:, :, ::-1])
-        cv2.waitKey(1)
+    def train(self):
+        self.training = True
 
     def close(self):
-        cv2.destroyAllWindows()
+        self.env.close()
 
 class Args:
     def __init__(self, game, seed):
