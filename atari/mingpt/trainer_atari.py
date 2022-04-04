@@ -7,7 +7,6 @@ The above copyright notice and this permission notice shall be included in all c
 
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 """
-import gym
 
 """
 Simple training loop; Boilerplate that could apply to any arbitrary neural network,
@@ -23,6 +22,8 @@ import numpy as np
 import torch
 from torch.utils.data.dataloader import DataLoader
 from torch.utils.tensorboard import SummaryWriter
+
+import gym
 
 from mingpt.utils import sample
 
@@ -127,6 +128,7 @@ class Trainer:
 
                     # report progress
                     pbar.set_description(f"epoch {epoch+1} iter {it}: train loss {loss.item():.5f}. lr {lr:e}")
+                    writer.add_scalar("Score/train_loss", loss.item(), it)
 
             if not is_train:
                 test_loss = float(np.mean(losses))
@@ -164,7 +166,6 @@ class Trainer:
             else:
                 raise NotImplementedError()
 
-            writer.add_scalar("Score/train_loss", train_loss, epoch)
             writer.add_scalar("Score/eval_reward", eval_return, epoch)
 
 
