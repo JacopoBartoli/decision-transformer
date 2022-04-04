@@ -1,7 +1,7 @@
 
 # Atari
 
-Edapted the implementation of [Decision Transformer] (https://github.com/kzl/decision-transformer.git) for the game [Lunar Lander](https://gym.openai.com/envs/LunarLander-v2/). 
+Edapted the implementation of [Decision Transformer](https://github.com/kzl/decision-transformer.git) for the game [Lunar Lander](https://gym.openai.com/envs/LunarLander-v2/). 
 
 ## Installation
 
