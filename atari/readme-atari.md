@@ -1,7 +1,11 @@
 
 # Atari
 
-Edapted the implementation of [Decision Transformer](https://github.com/kzl/decision-transformer.git) for the game [Lunar Lander](https://gym.openai.com/envs/LunarLander-v2/). 
+Adapted the implementation of [Decision Transformer](https://github.com/kzl/decision-transformer.git) for the game [Lunar Lander](https://gym.openai.com/envs/LunarLander-v2/).
+
+## Features
+
+The codebase added the functionality of testing the trained model, and it's also possible visualize the graphical results(the game played by the agent) in a .mp4 format.
 
 ## Installation
 
