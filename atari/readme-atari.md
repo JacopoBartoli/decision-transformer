@@ -5,7 +5,8 @@ Adapted the implementation of [Decision Transformer](https://github.com/kzl/deci
 
 ## Features
 
-The codebase added the functionality of testing the trained model, and it's also possible visualize the graphical results(the game played by the agent) in a .mp4 format.
+The base functionalities of the main project are mantained.
+This codebase added the functionality of testing the trained model, and it's also possible visualize the graphical results(the game played by the agent) in a .mp4 format.
 
 ## Installation
 
