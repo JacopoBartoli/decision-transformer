@@ -110,7 +110,8 @@ class Tester:
                                                                                              dtype=torch.int64).to(
                                         self.device)))
         env.close()
-        vid.close()
+        if self.recordings:
+            vid.close()
         test_return = reward_sum
         # print("target return: %d, eval return: %d" % (ret, test_return))
         # self.model.train(True)

@@ -1,13 +1,12 @@
 import logging
-import math
 
 import os
-
-import datetime
 
 import argparse
 
 import torch
+
+from tqdm import tqdm
 
 from mingpt.utils import set_seed
 from mingpt.model_atari import GPT, GPTConfig
@@ -23,8 +22,10 @@ parser.add_argument('--context_length', type=int, default=30)
 parser.add_argument('--game', type=str, default='LunarLander-v2')
 parser.add_argument('--vocab_size', type=int, default=4)
 parser.add_argument('--max_timestep', type=int, default=1000)
+parser.add_argument('--num_test', type=int, default=100)
 #
 parser.add_argument('--checkpoint_dir', type=str, default='checkpoints')
+parser.add_argument('--checkpoint_file', type=str, default='ckpt')
 args = parser.parse_args()
 
 set_seed(args.seed)
@@ -37,13 +38,18 @@ model = GPT(mconf)
 cwd = os.getcwd()
 path = os.path.join(cwd, args.checkpoint_dir)
 
-path = os.path.join(path, 'ckpt_Apr04_18-32-43.pth')
+path = os.path.join(path, args.checkpoint_file)
 
 model.load_state_dict(torch.load(path))
 
 tconf = TesterConfig(seed=args.seed, game=args.game, max_timestep=args.max_timestep)
 
 # If the testing video recordings is needed set the values to True.
-tester = Tester(model, tconf, recordings=True)
+tester = Tester(model, tconf, recordings=False)
 
-tester.test()
+result = 0
+for i in tqdm(range(args.num_test)):
+    result += tester.test()
+result = result / args.num_test
+
+print("Mean reward: {}".format(result))

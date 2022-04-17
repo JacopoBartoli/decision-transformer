@@ -16,13 +16,14 @@ from experience_dataset import Experience
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--seed', type=int, default=123)
-parser.add_argument('--context_length', type=int, default=30)
+parser.add_argument('--context_length', type=int, default=1)
 parser.add_argument('--epochs', type=int, default=5)
 parser.add_argument('--model_type', type=str, default='reward_conditioned')
 parser.add_argument('--game', type=str, default='LunarLander-v2')
 parser.add_argument('--batch_size', type=int, default=128)
 #
-parser.add_argument('--data_dir_prefix', type=str, default='./dqn_replay/')
+parser.add_argument('--data_dir_prefix', type=str, default='data')
+parser.add_argument('--data_name', type=str, default='LunarLander_500.npz')
 args = parser.parse_args()
 
 set_seed(args.seed)
@@ -30,7 +31,7 @@ set_seed(args.seed)
 
 def save_model(net):
     time = datetime.datetime.now()
-    time = time.strftime("%b%m_%H-%M-%S")
+    time = time.strftime("%b%d_%H-%M-%S")
 
     model_path = "./checkpoints"
 
@@ -49,7 +50,7 @@ def save_model(net):
 
 def load_replays(path):
     cwd = os.path.join(os.getcwd())
-    replay_path = os.path.join(cwd, './replays')
+    replay_path = os.path.join(cwd, 'data')
 
     try:
         if not os.path.isdir(replay_path):
@@ -62,12 +63,13 @@ def load_replays(path):
     return experience_dataset.load_data(replay_path)
 
 
-# Load the saved replays.
-cwd = os.path.join(os.getcwd(), os.pardir)
-cwd = os.path.join(cwd, os.pardir)
-cwd = os.path.join(cwd, "lunar_lander/data/LunarLander.npz")
+# Load the saved data.
+cwd = os.getcwd()
+data_dir = os.path.join(args.data_dir_prefix, args.data_name)
+cwd = os.path.join(cwd, data_dir)
 
 data = experience_dataset.load_data(cwd)
+data = data[:500000]
 states, actions, rtgs, done_idxs, timesteps = experience_dataset.create_dataset(data)
 
 # set up logging
